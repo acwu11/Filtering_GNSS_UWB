@@ -4,7 +4,6 @@
 import numpy as np
 import xarray as xr
 import georinex as gr
-#import LAMBDA
 import math
 
 date = np.datetime64("2021-06-08")
@@ -18,15 +17,15 @@ x0 = np.array([-2634649.672,-4162101.155,4038292.711])
 x0_lla = np.array([39.5340,-122.3342,121.1679])
 
 def findIdxs(t,eph):
-    idxs=[]
+    idxs = []
     for s in eph.sv.values:
-        toes=eph.sel(sv=s)['Toe']
+        toes = eph.sel(sv = s)['Toe']
         value = np.inf
-        idx=0
+        idx = 0
         for i in range(len(toes)):
-            if not np.isnan(toes[i]) and np.abs(toes[i]-t)<value:
-                idx=i
-                value = np.abs(toes[i]-t)
+            if not np.isnan(toes[i]) and np.abs(toes[i] - t) < value:
+                idx = i
+                value = np.abs(toes[i] - t)
         idxs.append(idx)
     return idxs
 
@@ -38,9 +37,9 @@ def timeInGPSWeek(t, date = date):
     '''
     dt = date-np.datetime64('1980-01-06')
     dt = dt.astype('float64')
-    nWeeks = np.floor(dt/7)
+    nWeeks = np.floor(dt / 7)
     
-    return (t-np.datetime64('1980-01-06')).astype('float64')*1e-9-nWeeks*7*24*60*60
+    return (t-np.datetime64('1980-01-06')).astype('float64') * 1e-9 - nWeeks * 7 * 24 * 60 * 60
 
 
 def findOffsetsOld(eph,svs,t):
@@ -52,7 +51,6 @@ def findOffsetsOld(eph,svs,t):
         idxs=findIdxs(t,eph)
         i=np.arange(len(svs))
         return eph['SVclockBias'].values[idxs,i]
-    #print(eph)
     return eph['SVclockBias'].values
 
 def findOffsets(eph,svs,t):
@@ -69,7 +67,6 @@ def findOffsets(eph,svs,t):
         driftrate=eph['SVclockDriftRate'].values[idxs,i]
         offsets=bias+drift*(t-t0)+driftrate*(t-t0)**2
         return offsets
-    #print(eph)
     else:
         t0=eph['Toe'].values
         bias=eph['SVclockBias'].values
@@ -82,10 +79,9 @@ def computeFlightTimes(codes,svs,eph,t):
     '''
     Compute the signal flight times at all times for all satellites
     '''
-    c=299792458
+    c = 299792458
     offsets = findOffsets(eph, svs,t)
-    #print(c*offsets)
-    flightTimes= codes/c - offsets
+    flightTimes = codes / c - offsets
     return flightTimes 
   
 def computeEmissionTimes(t, codes, svs, eph, date = date):
@@ -126,7 +122,6 @@ def getPos(eph, t, flightTimes, svs):
     if len(eph.time.values)>1:
         idxs=findIdxs(t,eph)
         i=np.arange(len(svs))
-        #print(eph['Toe'].values.shape)
         Toe=eph['Toe'].values[idxs,i]
         if np.any(np.isnan(Toe)):
             print('argaga')
@@ -233,13 +228,11 @@ def computeGeoMatrixDD(los,ref = 0):
     G = G - G[ref]
     return np.delete(G, ref, axis=0)
 
-def computeGeometry(eph,t,ft,svs, x0=np.zeros(3),ref = None, plane = None):
+def computeGeometry(eph, t, ft, svs, x0=np.zeros(3), ref = None, plane = None):
     '''
     Compute the goemetry matrix at a given time. If a ref index is given, compute the double difference with this reference
     '''
     sat_pos=getPos(eph,t,ft,svs)
-    #print(sat_pos.shape)
-    #print(sat_pos)
     sat_pos=correctPosition(sat_pos,x0)
     los=computeLOS(sat_pos,x0)
     if plane:
@@ -247,7 +240,6 @@ def computeGeometry(eph,t,ft,svs, x0=np.zeros(3),ref = None, plane = None):
             los[i] = ecef2enu(los[i],shift = False)
 
     elevation = 180*np.arccos(los[:,2])/np.pi 
-    #print('elevation', elevation)
     
     if ref is not None:
         G =  computeGeoMatrixDD(los, ref)
@@ -354,6 +346,7 @@ def computeSigma2(n, sigma_code = None, sigma_phase = None, f = 1575.42*10**6, p
     #print(np.dot(dd_sigma_code,A.T))
     #sigma_code = np.dot(A,np.dot(dd_sigma_code,A.T))
     #sigma_phase = np.dot(A,np.dot(dd_sigma_phase,A.T))
+    
     # below does all the steps commented above much much quicker
     sigma_code = 2*(sigma_code[ref]*np.ones((n,n)) + np.diag(np.delete(sigma_code,ref)))
     sigma_phase = 2*(sigma_phase[ref]*np.ones((n,n)) + np.diag(np.delete(sigma_phase,ref)))
@@ -397,3 +390,15 @@ def wrap_angle_0t360(angle):
     elif angle <= 0:
         angle += 360
     return angle
+
+#############################################################  
+# OTHER FUNCTIONS
+#############################################################  
+def id_map(sv_lst, dim=2):
+    id2ind = {}
+    state_ind = 2 * dim
+    for i in range(len(sv_lst)):
+        id2ind[sv_lst[i]] = state_ind
+        state_ind += 1
+        
+    return id2ind

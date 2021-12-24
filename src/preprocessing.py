@@ -5,7 +5,6 @@ import numpy as np
 import xarray as xr
 import georinex as gr
 from utils import *
-import os
 
 #define the measurement date in YYYY-MM-DD
 # date = np.datetime64("2020-02-06")
@@ -61,18 +60,15 @@ def constructMeasurements(traj1, traj2, date,sort_cn0 = False):
     cnos=[]
     t_gps=[]
     for t in ts:
-        #print(t)
         t1_t = traj1.sel(time=t)
         if t1_t['C1C'].ndim > 1:
             code_t1 = t1_t['C1C'][0] #+ 500 * np.random.normal(0, 0.5, len(t1_t['C1C'][0])) 
         else:
-            #print ('alls')
             code_t1 = t1_t['C1C'] #+ 500 * np.random.normal(0, 0.5, len(t1_t['C1C'])) 
         t2_t = traj2.sel(time=t)
         if t2_t['C1C'].ndim > 1:
             code_t2 = t2_t['C1C'][0]
         else:
-            #print ('alls')
             code_t2 = t2_t['C1C'] + 5 * np.random.normal(0, 0.5, len(t2_t['C1C'])) 
         # sv1 = set([t1_t.sv.values[i] for i in range(len(t1_t.sv.values)) if not np.isnan(code_t1[i])])
         # sv2 = set([t2_t.sv.values[i] for i in range(len(t2_t.sv.values)) if not np.isnan(code_t2[i])])
@@ -80,14 +76,12 @@ def constructMeasurements(traj1, traj2, date,sort_cn0 = False):
         sv1 = [t1_t.sv.values[i] for i in range(len(t1_t.sv.values)) if not np.isnan(code_t1[i])]
         sv2 = [t2_t.sv.values[i] for i in range(len(t2_t.sv.values)) if not np.isnan(code_t2[i])]
         sv = np.intersect1d(sv1,sv2)
-        #svs.append(sv)
+
         try:
             t1_t = t1_t.sel(sv=sv)
             t2_t = t2_t.sel(sv=sv)
         except:
             print(sv)
-        #print(t1_t['S1C'])
-        #print(t2_t['S1C'])
 
         if sort_cn0:
             if t1_t['C1C'].ndim > 1:
@@ -100,18 +94,12 @@ def constructMeasurements(traj1, traj2, date,sort_cn0 = False):
             else:
                 order = np.arange(len(t1_t['S1C'].values))
         
-        if t1_t['C1C'].ndim > 1:
-            #print ('this')
-            #k = len(t1_t['C1C'][0].values[order])
-            #noise = 50 * np.random.normal(0, 0.5, 12)        
+        if t1_t['C1C'].ndim > 1:     
             code1.append(t1_t['C1C'][0].values[order] )
             carrier1.append(t1_t['L1C'][0].values[order])
             cnos.append(t1_t['S1C'][0].values[order])
             svs.append(sv[order])
         else:
-            #print (t1_t['C1C'].values[order])
-            # k = len(t1_t['C1C'][0].values[order])
-            # noise = 50 * np.random.normal(0, 0.5, k)
             code1.append(t1_t['C1C'].values[order] )
             carrier1.append(t1_t['L1C'].values[order])
             cnos.append(t1_t['S1C'].values[order])
@@ -146,20 +134,15 @@ def prepareData(t, svs, code1, code2, carrier1, carrier2, eph,
     phase_error: assumed error in meter in carrier phase measurements for default noise estimation
     sigma_code,sigma_phase: can be used to specify noise standard deviations
     """
-    c=299792458
+    c = 299792458
     lda = c/f
-    n=len(svs) -1
-    #t = timeInGPSWeek(t, date)
+    n = len(svs) -1
     ft = computeFlightTimes(code1, svs, eph,t)
-    #print(ft.shape)
     H = computeGeometry(eph, t, ft, svs, x0, ref, plane)
-        
     psi = computeDD(code1, code2, carrier1, carrier2, lda, ref)
-    #print ('psi', psi)
-    
     A = np.zeros((2*n,n))
-    A[:n]=lda*np.eye(n)
-    sigma= computeSigma2(n,sigma_code,sigma_phase,f,phase_error,ref)
+    A[:n] = lda*np.eye(n)
+    sigma = computeSigma2(n,sigma_code,sigma_phase,f,phase_error,ref)
     return psi, H, A, sigma
 
 def prepareAllData(ts, svs, code1, code2, carrier1, carrier2, eph, 
@@ -179,23 +162,3 @@ def prepareAllData(ts, svs, code1, code2, carrier1, carrier2, eph,
         As.append(A)
         sigmas.append(sigma)
     return psis, Hs, As, sigmas
-
-#print(gr.load(name_obs2)['L1C'])    
-#print(gr.load('data/200206_224210_sec.20O')['L1'])    
-#traj1, traj2, eph = loadTrajectories()
-#print(traj1)
-#print(traj2)
-#print(eph)
-#t_gps, svs, code1, code2, carrier1, carrier2, ts = constructMeasurements(traj1,traj2)
-#i = 0
-#while len(svs[i]) < 13:
-#    i+=1
-#print(i)
-#print(len(t_gps))
-#print(np.max(np.array(ts[1:])-np.array(ts[:-1])).astype(float)*1e-9)
-#traj1.to_netcdf('data/traj1.nc')
-#traj2.to_netcdf('data/traj2.nc')
-#eph.to_netcdf('data/eph.nc')
-
-#traj1,traj2,eph = loadSavedTrajectories()
-#print(traj1['C1C'])
