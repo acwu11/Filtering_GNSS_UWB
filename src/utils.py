@@ -5,8 +5,7 @@ import numpy as np
 import xarray as xr
 import georinex as gr
 import math
-
-date = np.datetime64("2021-06-08")
+import LAMBDA
 
 #old one
 #x0 = np.array([-2634636.33395241, -4162082.25080632, 4038273.62708483]) 
@@ -16,7 +15,7 @@ date = np.datetime64("2021-06-08")
 x0 = np.array([-2634649.672,-4162101.155,4038292.711])
 x0_lla = np.array([39.5340,-122.3342,121.1679])
 
-def findIdxs(t,eph):
+def findIdxs(t, eph):
     idxs = []
     for s in eph.sv.values:
         toes = eph.sel(sv = s)['Toe']
@@ -31,7 +30,7 @@ def findIdxs(t,eph):
 
 
 
-def timeInGPSWeek(t, date = date):
+def timeInGPSWeek(t, date):
     '''
     Compute time in the GPS week
     '''
@@ -42,7 +41,7 @@ def timeInGPSWeek(t, date = date):
     return (t-np.datetime64('1980-01-06')).astype('float64') * 1e-9 - nWeeks * 7 * 24 * 60 * 60
 
 
-def findOffsetsOld(eph,svs,t):
+def findOffsetsOld(eph, svs, t):
     '''
     Compute clock biases
     '''
@@ -53,7 +52,7 @@ def findOffsetsOld(eph,svs,t):
         return eph['SVclockBias'].values[idxs,i]
     return eph['SVclockBias'].values
 
-def findOffsets(eph,svs,t):
+def findOffsets(eph, svs, t):
     '''
     Compute clock biases
     '''
@@ -75,7 +74,7 @@ def findOffsets(eph,svs,t):
         offsets=bias+drift*(t-t0)+driftrate*(t-t0)**2
         return offsets
 
-def computeFlightTimes(codes,svs,eph,t):
+def computeFlightTimes(codes, svs, eph, t):
     '''
     Compute the signal flight times at all times for all satellites
     '''
@@ -84,7 +83,7 @@ def computeFlightTimes(codes,svs,eph,t):
     flightTimes = codes / c - offsets
     return flightTimes 
   
-def computeEmissionTimes(t, codes, svs, eph, date = date):
+def computeEmissionTimes(t, codes, svs, eph, date):
     '''
     Compute the actual emission times by substrating the time of flight
     NB: the measured code is the actual travel time *c + clock offset
@@ -95,7 +94,7 @@ def computeEmissionTimes(t, codes, svs, eph, date = date):
     return t - ft
 
 
-def solveKepler(M,e,eps=1e-15,maxiter=20):
+def solveKepler(M, e, eps=1e-15, maxiter=20):
     '''
     Solve kepler algorithm
     For GPS should converge in few iterations (even 1)
@@ -178,7 +177,7 @@ def getPos(eph, t, flightTimes, svs):
         print(sqrtA)
     return np.block([[x],[y],[z]]).T
 
-def computeLOS(sat_pos,x0=np.zeros(3)):
+def computeLOS(sat_pos, x0=np.zeros(3)):
     '''
     Compute the line of sight vectors for all satellites to a given position
     '''
@@ -193,7 +192,7 @@ def computeRotation(theta):
     '''
     return np.array([[np.cos(theta), np.sin(theta), 0.], [-np.sin(theta), np.cos(theta), 0.], [0., 0., 1.]])
 
-def correctPositionOld(sat_pos,flightTimes):
+def correctPositionOld(sat_pos, flightTimes):
     '''
     Correct satellite position for the earth rotation
     '''
@@ -206,7 +205,7 @@ def correctPositionOld(sat_pos,flightTimes):
         cpos[i]=np.dot(computeRotation(theta[i]),sat_pos[i])
     return cpos
     
-def correctPosition(sat_pos,x0=x0):
+def correctPosition(sat_pos, x0=x0):
     '''
     Correct satellite position for the earth rotation
     '''
@@ -220,7 +219,7 @@ def correctPosition(sat_pos,x0=x0):
         cpos[i]=np.dot(computeRotation(theta[i]),sat_pos[i])
     return cpos
 
-def computeGeoMatrixDD(los,ref = 0):
+def computeGeoMatrixDD(los, ref=0):
     '''
     Compute the (double difference) geometry matrix from los assuming the reference satellite is ref (index)
     '''
@@ -360,22 +359,40 @@ def sigmaFromCN0(cno, ksnr, phase_ratio):
     sigma_phase = [sigma/phase_ratio for sigma in sigma_code]
     return sigma_code,sigma_phase
 
-# TIME SYNCHRONIZING FILES
 
-def get_obs_startInd(ts, date, ground_truth):
-    obs_start_ind = -1
-    for i in range(0, len(ts)):
-        if timeInGPSWeek(ts[i], date) == ground_truth[0, 0]:
-            obs_start_ind = i
-            break
+#############################################################  
+# OTHER FUNCTIONS
+#############################################################  
 
-    if obs_start_ind == -1:
-        print('no match start time')
-    else:
-        return obs_start_ind
+#- TIME SYNCING -----------------------------------------------------------
+def match_times(ground_truth, obs_times):
+    # match time stamps of ground truth and observation
+    temp_ind = 0
+    gt_inds = []
+    obs_inds = []
+
+    for i in range(len(ground_truth)):
+        gt_t = ground_truth[i, 0]
+        for j in range(temp_ind, len(obs_times)):
+            if obs_times[j] == gt_t:
+                gt_inds.append(i)
+                obs_inds.append(j)
+                temp_ind = j
+
+    return gt_inds, obs_inds
 
 
-# ANGLE WRAPPING
+def id_map(sv_lst, dim=2):
+    id2ind = {}
+    state_ind = 2 * dim
+    for i in range(len(sv_lst)):
+        id2ind[sv_lst[i]] = state_ind
+        state_ind += 1
+        
+    return id2ind
+
+
+#- ANGLE WRAPPING --------------------------------------------------------------
 
 def wrap_angle_02pi(angle):
     if angle >= 2 * math.pi:
@@ -391,14 +408,45 @@ def wrap_angle_0t360(angle):
         angle += 360
     return angle
 
-#############################################################  
-# OTHER FUNCTIONS
-#############################################################  
-def id_map(sv_lst, dim=2):
-    id2ind = {}
-    state_ind = 2 * dim
-    for i in range(len(sv_lst)):
-        id2ind[sv_lst[i]] = state_ind
-        state_ind += 1
-        
-    return id2ind
+#- INT / POSITION FIXING ----------------------------------------------------------
+def lambda_positionFix(float_solu, sigma, psi, k, lda, H, A, Qahat=None):
+    '''
+    Computes fixed integers using LAMBDA and corresponding fixed position
+
+    Inputs: float_solu : float solution of integer ambiguity [# cycles]
+    '''
+
+    if Qahat is not None:
+        pass
+    else:
+        C = A
+        Qi = np.linalg.inv(sigma)
+        Qhat = np.linalg.inv(np.dot(C.T, np.dot(Qi, C)))
+        Qahat = (Qhat + Qhat.T) /2
+    afixed, sqnorm, Ps, Qzhat, Z, nfixed, mu = LAMBDA.main(float_solu, Qahat, 1)
+    
+    if afixed.ndim > 1:
+        afixed = afixed[:,0]
+
+    a = psi[:k]
+    b =  lda * afixed
+    fixed_pos =  a - b
+    fixed_pos = np.dot(np.linalg.pinv(H[:k]), fixed_pos)
+    
+    return fixed_pos, afixed, Ps
+
+def round_positionFix(float_solu, psi, k, lda, H):
+    '''
+    float_solu : float solution of interger ambiguity [# cycles]
+    '''
+    around = []
+    for jj in range(len(float_solu)):
+        around.append(round(float_solu[jj][0]))
+    around = np.array(around)
+
+    a = psi[:k]
+    b = lda * around
+    round_pos = a - b
+    round_pos = np.dot(np.linalg.pinv(H[:k]), round_pos)
+
+    return round_pos, around

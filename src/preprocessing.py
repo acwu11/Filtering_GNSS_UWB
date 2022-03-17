@@ -6,17 +6,6 @@ import xarray as xr
 import georinex as gr
 from utils import *
 
-#define the measurement date in YYYY-MM-DD
-# date = np.datetime64("2020-02-06")
-# #x0 = np.array([-2634636.33395241, -4162082.25080632, 4038273.62708483])
-# x0 = np.array([-2634636.33074538, -4162082.2465598, 4038273.58471636])
-# name_obs1 = 'data/Trajectory1/traj1.21O'
-# name_obs2 = 'data/Trajectory2/traj2.21O'
-# name_eph = 'data/Trajectory1/traj1.21N'
-#name_obs1 = 'data/Line1/line1.21O'
-#name_obs2 = 'data/Line2/line2.21O'
-#name_eph = 'data/Line1/line1.21N'
-
 def loadTrajectories(name_obs1, name_obs2, name_eph):
     """
     Load rinex files into xarrays
@@ -114,12 +103,13 @@ def constructMeasurements(traj1, traj2, date,sort_cn0 = False):
     return t_gps, svs, code1, code2, carrier1, carrier2, cnos, ts
 
 def prepareData(t, svs, code1, code2, carrier1, carrier2, eph, 
-                plane=False,ref=0,x0=x0,f=1575.42*10**6,
-                phase_error=0.025,sigma_code=None,sigma_phase=None):
+                plane=False, ref=0, x0=x0, f=1575.42*10**6,
+                phase_error=0.025, sigma_code=None, sigma_phase=None):
     """
     Generate psi, H, A and sigma for the optimization problem.
     Works both in 2D and 3D with the plane variable
     For 2D need to add computation of H in ENU
+    
     Inputs:
     t: current date in seconds in the GPS week
     svs: list of satellite in views by both recieevrs at time t
@@ -134,10 +124,11 @@ def prepareData(t, svs, code1, code2, carrier1, carrier2, eph,
     phase_error: assumed error in meter in carrier phase measurements for default noise estimation
     sigma_code,sigma_phase: can be used to specify noise standard deviations
     """
+
     c = 299792458
     lda = c/f
     n = len(svs) -1
-    ft = computeFlightTimes(code1, svs, eph,t)
+    ft = computeFlightTimes(code1, svs, eph, t)
     H = computeGeometry(eph, t, ft, svs, x0, ref, plane)
     psi = computeDD(code1, code2, carrier1, carrier2, lda, ref)
     A = np.zeros((2*n,n))

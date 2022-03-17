@@ -719,8 +719,8 @@ def main(ahat,Qahat,method=1,ncands=2,P0=0.995,mu=1):
     #               computational efficiency; 1D numpy array)                 #
     #       Qahat : Variance-covariance matrix of float ambiguities           #
     #               (2D numpy array)                                          #
-    #       method: 1 -> ILS method based on search-and-shrink [default]      #
-    #               2 -> Integer rounding method                              #
+    #       method: 1 -> dILS method based on search-and-shrink [default]      #
+    #               2 -> Integer rounding metho                              #
     #               3 -> Integer bootstrapping method                         #
     #               4 -> PAR with the input P0 of user-defined success rate   #
     #               5 -> ILS method with Ratio Test (uses search-and-shrink)  #
